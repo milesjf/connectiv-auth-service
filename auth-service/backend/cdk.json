@@ -1,0 +1,10 @@
+{
+  "app": "python3 app.py",
+  "context": {
+    "projectName": "SecureAPI",
+    "account": "268072525263",
+    "awsRegion": "us-west-2",
+    "domainName": "leidos-datamesh.com",
+    "certificateArn": "arn:aws:acm:us-east-1:268072525263:certificate/4a4514a1-d31e-4ad1-81eb-3c66790fe579"
+  }
+}

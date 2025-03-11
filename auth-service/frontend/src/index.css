@@ -1,0 +1,191 @@
+/* Basic resets */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Arial", sans-serif;
+  background-color: #2C0D35; /* Deep purple background */
+  color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Container that holds the entire app */
+.app-container {
+  width: 100%;
+  max-width: 500px;
+  padding: 20px;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.fade-out {
+  opacity: 0.6;
+}
+
+.fade-in {
+  opacity: 1;
+}
+
+/* Logo container */
+.logo-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  width: 150px;
+}
+
+/* Card styling */
+.card {
+  background-color: #3d0f47;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+}
+
+.card-title {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* Form groups */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.form-group.row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.form-group.row .input-label {
+  margin-right: 10px;
+}
+
+/* Input styling */
+.input-label {
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
+.input-field {
+  padding: 8px 12px;
+  border: 1px solid #b896c9;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  color: #333;
+  outline: none;
+  font-size: 1rem;
+}
+
+.input-field.select-field {
+  min-width: 100px;
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.btn {
+  cursor: pointer;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary {
+  background-color: #8B48A3;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #A14AC3;
+}
+
+.btn-secondary {
+  background-color: #5f4b5f;
+  color: #ffffff;
+}
+
+.btn-secondary:hover {
+  background-color: #7b6e7b;
+}
+
+.btn-close {
+  background: transparent;
+  color: #fff;
+  font-size: 1.2rem;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.btn-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Error message */
+.error-message {
+  color: #ff7b7b;
+  margin-top: 10px;
+}
+
+/* API response container */
+.api-response-wrapper {
+  margin-top: 20px;
+  background-color: #4b1756;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.api-response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #6c1c7c;
+  padding: 10px 16px;
+}
+
+.api-response-header span {
+  font-weight: bold;
+}
+
+.api-response-container {
+  max-height: 300px; /* or auto, depending on your preference */
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.api-response {
+  white-space: pre-wrap;
+  font-family: monospace;
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
