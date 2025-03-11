@@ -14,6 +14,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     CfnOutput,
+    Fn
 )
 from aws_cdk.aws_cloudfront_origins import S3Origin
 from constructs import Construct
@@ -249,25 +250,70 @@ class FrontendStack(Stack):
             website_bucket: s3.Bucket,
             deployment: s3_deployment.BucketDeployment
     ) -> None:
-        """Write runtime configuration to S3 bucket."""
-        # Fetch parameters from SSM
-        config_content = json.dumps({
-            "REACT_APP_COGNITO_USER_POOL_ID":
-                ssm.StringParameter.value_for_string_parameter(
-                    self, f"/{project_name}/REACT_APP_COGNITO_USER_POOL_ID"
-                ),
-            "REACT_APP_COGNITO_USER_POOL_CLIENT_ID":
-                ssm.StringParameter.value_for_string_parameter(
-                    self, f"/{project_name}/REACT_APP_COGNITO_USER_POOL_CLIENT_ID"
-                ),
-            "REACT_APP_API_GATEWAY_URL":
-                ssm.StringParameter.value_for_string_parameter(
-                    self, f"/{project_name}/REACT_APP_API_GATEWAY_URL"
-                )
-        })
+        """
+        Fetch runtime config from SSM at deploy time (not synth),
+        then write config.json to the website bucket using a Custom Resource.
+        """
 
-        # Create custom resource to write config.json
-        config_writer = cr.AwsCustomResource(
+        # 1) Fetch all SSM parameters at deploy time
+        fetch_params = cr.AwsCustomResource(
+            self,
+            f"{project_name}-FetchParams",
+            on_create=cr.AwsSdkCall(
+                service="SSM",
+                action="getParameters",
+                parameters={
+                    "Names": [
+                        f"/{project_name}/REACT_APP_COGNITO_USER_POOL_ID",
+                        f"/{project_name}/REACT_APP_COGNITO_USER_POOL_CLIENT_ID",
+                        f"/{project_name}/REACT_APP_API_GATEWAY_URL"
+                    ],
+                    "WithDecryption": True
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{project_name}-FetchParams-v1")
+            ),
+            on_update=cr.AwsSdkCall(
+                # use the same call on update, so you get fresh parameter values if they change
+                service="SSM",
+                action="getParameters",
+                parameters={
+                    "Names": [
+                        f"/{project_name}/REACT_APP_COGNITO_USER_POOL_ID",
+                        f"/{project_name}/REACT_APP_COGNITO_USER_POOL_CLIENT_ID",
+                        f"/{project_name}/REACT_APP_API_GATEWAY_URL"
+                    ],
+                    "WithDecryption": True
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(f"{project_name}-FetchParams-v1")
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements([
+                iam.PolicyStatement(
+                    actions=["ssm:GetParameters"],
+                    resources=[
+                        # Restrict to your project’s SSM path
+                        f"arn:aws:ssm:{self.region}:{self.account}:parameter/{project_name}/*"
+                    ]
+                )
+            ])
+        )
+
+        # Each parameter will appear under "Parameters" in the API response array
+        # in the same order you requested them. Example response:
+        # {
+        #   "Parameters": [
+        #       { "Name": "/PROJECT/REACT_APP_COGNITO_USER_POOL_ID", "Value": "XXXXXX" },
+        #       { "Name": "/PROJECT/REACT_APP_COGNITO_USER_POOL_CLIENT_ID", "Value": "YYYYYY" },
+        #       { "Name": "/PROJECT/REACT_APP_API_GATEWAY_URL", "Value": "ZZZZZZ" }
+        #   ],
+        #   "InvalidParameters": []
+        # }
+
+        user_pool_id = fetch_params.get_response_field("Parameters.0.Value")
+        user_pool_client_id = fetch_params.get_response_field("Parameters.1.Value")
+        api_gateway_url = fetch_params.get_response_field("Parameters.2.Value")
+
+        # 2) Write the config.json file to S3 in a second Custom Resource
+        write_config = cr.AwsCustomResource(
             self,
             f"{project_name}-WriteConfig",
             on_create=cr.AwsSdkCall(
@@ -276,7 +322,37 @@ class FrontendStack(Stack):
                 parameters={
                     "Bucket": website_bucket.bucket_name,
                     "Key": "config.json",
-                    "Body": config_content,
+                    # Build the JSON body from the SSM parameter tokens
+                    "Body": Fn.join(
+                        "",
+                        [
+                            "{",
+                            f"\"REACT_APP_COGNITO_USER_POOL_ID\":\"", user_pool_id, "\",",
+                            f"\"REACT_APP_COGNITO_USER_POOL_CLIENT_ID\":\"", user_pool_client_id, "\",",
+                            f"\"REACT_APP_API_GATEWAY_URL\":\"", api_gateway_url, "\"",
+                            "}"
+                        ]
+                    ),
+                    "ContentType": "application/json"
+                },
+                physical_resource_id=cr.PhysicalResourceId.of("config.json")  # ensures stable resource ID
+            ),
+            on_update=cr.AwsSdkCall(
+                service="S3",
+                action="putObject",
+                parameters={
+                    "Bucket": website_bucket.bucket_name,
+                    "Key": "config.json",
+                    "Body": Fn.join(
+                        "",
+                        [
+                            "{",
+                            f"\"REACT_APP_COGNITO_USER_POOL_ID\":\"", user_pool_id, "\",",
+                            f"\"REACT_APP_COGNITO_USER_POOL_CLIENT_ID\":\"", user_pool_client_id, "\",",
+                            f"\"REACT_APP_API_GATEWAY_URL\":\"", api_gateway_url, "\"",
+                            "}"
+                        ]
+                    ),
                     "ContentType": "application/json"
                 },
                 physical_resource_id=cr.PhysicalResourceId.of("config.json")
@@ -289,9 +365,11 @@ class FrontendStack(Stack):
             ])
         )
 
-        # Ensure proper dependency ordering
-        config_writer.node.add_dependency(website_bucket)
-        config_writer.node.add_dependency(deployment)
+        # Enforce the correct order: we must fetch parameters before writing config.json
+        # and we must have the website bucket + initial deployment in place before writing config.
+        write_config.node.add_dependency(fetch_params)
+        write_config.node.add_dependency(website_bucket)
+        write_config.node.add_dependency(deployment)
 
     def _create_outputs(self, project_name: str, domain_name: str, logging_bucket: s3.Bucket) -> None:
         """Create CloudFormation outputs."""
